@@ -1199,6 +1199,9 @@ def main(argv: Optional[list[str]] = None) -> int:
     except DstackError as e:
         print(f"dstack: {e}", file=sys.stderr)
         return 1
+    except BrokenPipeError:  # e.g. `dstack status | head`
+        os.dup2(os.open(os.devnull, os.O_WRONLY), sys.stdout.fileno())
+        return 1
     return 0
 
 
