@@ -18,6 +18,21 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SCRIPT = os.path.join(ROOT, "config", "claude", "statusline.sh")
 BASH = shutil.which("bash") or "/bin/bash"
 GIT = shutil.which("git")
+
+
+def comma_locale():
+    """A locale whose decimal separator is a comma, or None if none is installed."""
+    try:
+        names = subprocess.run(["locale", "-a"], capture_output=True, text=True).stdout.split()
+    except OSError:
+        return None
+    for want in ("de_DE.UTF-8", "de_DE.utf8", "fr_FR.UTF-8", "fr_FR.utf8"):
+        if want in names:
+            return want
+    return None
+
+
+COMMA_LOCALE = comma_locale()
 JQ = shutil.which("jq")
 ANSI = re.compile(r"\x1b\[[0-9;]*m")
 SEP = " │ "
@@ -44,7 +59,7 @@ class StatuslineCase(unittest.TestCase):
             "PATH": self.bin + os.pathsep + os.environ.get("PATH", "/usr/bin:/bin"),
             "HOME": self.tmp,
             "XDG_CACHE_HOME": self.cache,
-            "LC_ALL": "en_US.UTF-8",
+            "LC_ALL": "C",  # always installed; a missing locale makes bash warn on stderr
             "GIT_CONFIG_NOSYSTEM": "1",
             "GIT_CONFIG_GLOBAL": os.devnull,
         }
@@ -204,8 +219,10 @@ class PayloadTests(StatuslineCase):
             out = self.run_sl(self.payload(cost={"total_cost_usd": cost}))
             self.assertTrue(out.endswith(SEP + label), (cost, out))
 
+    @unittest.skipUnless(COMMA_LOCALE, "no comma-decimal locale installed")
     def test_comma_locale(self):
-        out = self.run_sl(self.payload(), LC_ALL="de_DE.UTF-8", LANG="de_DE.UTF-8", LC_NUMERIC="de_DE.UTF-8")
+        loc = COMMA_LOCALE
+        out = self.run_sl(self.payload(), LC_ALL=loc, LANG=loc, LC_NUMERIC=loc)
         self.assertEqual(out, "Opus 5.5 · high │ plain │ ▓▓▓▓░░░░░░ 42% of 200K │ $1.23")
 
     def test_no_color(self):
