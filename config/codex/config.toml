@@ -1,0 +1,12 @@
+# Keys dstack manages in ~/.codex/config.toml. `bin/dstack install` sets each key in its table
+# and leaves every other line (projects, MCP servers, plugins, hook trust) untouched.
+# Flat `key = value` lines only.
+
+model = "gpt-6.1-sol"
+model_reasoning_effort = "medium"
+approval_policy = "never"
+sandbox_mode = "danger-full-access"
+
+[tui]
+status_line = ["model-with-reasoning", "current-dir", "thread-name", "git-branch", "pull-request-number", "context-used", "context-window-size"]
+status_line_use_colors = true

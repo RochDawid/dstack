@@ -1,0 +1,26 @@
+{
+  "$comment": "Keys dstack manages in ~/.claude/settings.json. `bin/dstack install` deep-merges these over your file; everything else is left alone. $DSTACK expands to this repo.",
+  "model": "opus[1m]",
+  "effortLevel": "medium",
+  "modelSettings": {
+    "claude-opus-5-5": { "effortLevel": "medium" }
+  },
+  "permissions": {
+    "defaultMode": "bypassPermissions"
+  },
+  "skipDangerousModePermissionPrompt": true,
+  "attribution": { "commit": "", "pr": "" },
+  "statusLine": {
+    "type": "command",
+    "command": "$DSTACK/config/claude/statusline.sh",
+    "padding": 0
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [{ "type": "command", "command": "$DSTACK/config/hooks/guard.sh" }]
+      }
+    ]
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$DSTACK/config/hooks/guard.sh",
+            "statusMessage": "dstack guard"
+          }
+        ]
+      }
+    ]
+  }
+}

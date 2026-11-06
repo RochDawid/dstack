@@ -1,0 +1,331 @@
+#!/usr/bin/env python3
+"""dstack: personal skills + harness config for Claude Code and Codex.
+
+  dstack sync [source...]   fetch upstream skills into vendor/ and pin them in dstack.lock.json
+  dstack install            link skills/agents/instructions and merge settings into ~/.claude and ~/.codex
+  dstack status             show what is linked, what drifted, and whether upstream moved
+"""
+from __future__ import annotations
+
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+import time
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+HOME = Path.home()
+MANIFEST = ROOT / "dstack.json"
+LOCK = ROOT / "dstack.lock.json"
+VENDOR = ROOT / "vendor"
+OWN_SKILLS = ROOT / "skills"
+
+CLAUDE = HOME / ".claude"
+CODEX = HOME / ".codex"
+AGENTS_SKILLS = HOME / ".agents" / "skills"  # Codex user skills
+SKILL_DIRS = [CLAUDE / "skills", AGENTS_SKILLS]
+
+
+def load_json(path: Path, default=None):
+    return json.loads(path.read_text()) if path.exists() else default
+
+
+def write_json(path: Path, data) -> None:
+    path.write_text(json.dumps(data, indent=2) + "\n")
+
+
+def git(*args: str, cwd: Path | None = None) -> str:
+    return subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True, text=True).stdout.strip()
+
+
+def say(msg: str) -> None:
+    print(msg, flush=True)
+
+
+# ---------------------------------------------------------------- sync
+
+def sync(only: list[str]) -> None:
+    manifest = load_json(MANIFEST)
+    lock = load_json(LOCK, {"sources": {}})
+    clones: dict[tuple[str, str], tuple[Path, str]] = {}
+    with tempfile.TemporaryDirectory(prefix="dstack-") as tmp:
+        for name, src in manifest["sources"].items():
+            if only and name not in only:
+                continue
+            key = (src["repo"], src["ref"])
+            if key not in clones:
+                dest = Path(tmp) / f"clone{len(clones)}"
+                say(f"fetch {src['repo']}@{src['ref']}")
+                git("clone", "--quiet", "--depth", "1", "--branch", src["ref"], src["repo"], str(dest))
+                clones[key] = (dest, git("rev-parse", "HEAD", cwd=dest))
+            repo, commit = clones[key]
+            root = repo / src["root"] if src["root"] else repo
+            out = VENDOR / name
+            old = lock["sources"].get(name, {})
+
+            skills = resolve_skills(src, root)
+            if out.exists():
+                shutil.rmtree(out)
+            (out / "skills").mkdir(parents=True)
+            for skill, rel in skills.items():
+                shutil.copytree(root / rel, out / "skills" / skill, symlinks=True)
+            for rel in src.get("files", []):
+                s = root / rel
+                d = out / rel
+                d.parent.mkdir(parents=True, exist_ok=True)
+                (shutil.copytree if s.is_dir() else shutil.copy2)(s, d)
+
+            lock["sources"][name] = {"repo": src["repo"], "ref": src["ref"], "commit": commit, "skills": sorted(skills)}
+            added = sorted(set(skills) - set(old.get("skills", [])))
+            removed = sorted(set(old.get("skills", [])) - set(skills))
+            moved = "" if old.get("commit") == commit else f" {old.get('commit', 'none')[:7]} -> {commit[:7]}"
+            say(f"  {name}: {len(skills)} skills{moved}"
+                + (f" +{','.join(added)}" if added and old else "")
+                + (f" -{','.join(removed)}" if removed else ""))
+    write_json(LOCK, lock)
+    check_collisions(lock)
+    say("done. review with `git diff --stat vendor/`, then `bin/dstack install`.")
+
+
+def resolve_skills(src: dict, root: Path) -> dict[str, str]:
+    if src["skills"] == "*":
+        exclude = set(src.get("exclude", []))
+        return {p.name: f"skills/{p.name}" for p in sorted((root / "skills").iterdir())
+                if (p / "SKILL.md").exists() and p.name not in exclude}
+    return dict(src["skills"])
+
+
+def all_skills(lock: dict) -> dict[str, Path]:
+    found: dict[str, Path] = {}
+    for name, entry in lock["sources"].items():
+        for skill in entry["skills"]:
+            found.setdefault(skill, VENDOR / name / "skills" / skill)
+    if OWN_SKILLS.exists():
+        for p in sorted(OWN_SKILLS.iterdir()):
+            if (p / "SKILL.md").exists():
+                found[p.name] = p  # own skills win
+    return found
+
+
+def check_collisions(lock: dict) -> None:
+    seen: dict[str, str] = {}
+    for name, entry in lock["sources"].items():
+        for skill in entry["skills"]:
+            if skill in seen:
+                say(f"  warning: `{skill}` comes from both {seen[skill]} and {name}; {seen[skill]} wins")
+            seen.setdefault(skill, name)
+
+
+# ---------------------------------------------------------------- install
+
+def owned(link: Path) -> bool:
+    """A link is ours when it points into this repo."""
+    return link.is_symlink() and str(Path(os.readlink(link))).startswith(str(ROOT))
+
+
+def link(target: Path, at: Path, backup_dir: Path) -> None:
+    if at.is_symlink() and Path(os.readlink(at)) == target:
+        return
+    if at.exists() or at.is_symlink():
+        if owned(at):
+            at.unlink()
+        else:
+            backup_dir.mkdir(parents=True, exist_ok=True)
+            shutil.move(str(at), backup_dir / at.name)
+            say(f"  backed up {at} -> {backup_dir / at.name}")
+    at.parent.mkdir(parents=True, exist_ok=True)
+    at.symlink_to(target)
+
+
+def install() -> None:
+    lock = load_json(LOCK)
+    if not lock:
+        sys.exit("no dstack.lock.json; run `bin/dstack sync` first")
+    stamp = time.strftime("%Y%m%d-%H%M%S")
+    backups = HOME / ".dstack-backups" / stamp
+
+    adopt_agents_skills(backups)
+
+    skills = all_skills(lock)
+    for d in SKILL_DIRS:
+        d.mkdir(parents=True, exist_ok=True)
+        for entry in d.iterdir():  # prune links to skills we no longer ship
+            if owned(entry) and entry.name not in skills:
+                entry.unlink()
+        for skill, path in skills.items():
+            link(path, d / skill, backups / d.relative_to(HOME))
+    say(f"linked {len(skills)} skills into {', '.join(str(d) for d in SKILL_DIRS)}")
+
+    manifest = load_json(MANIFEST)
+    for rel in manifest.get("agents", []):
+        src = ROOT / rel
+        link(src, CLAUDE / "agents" / src.name, backups / ".claude/agents")
+
+    link(ROOT / "global" / "AGENTS.md", CLAUDE / "CLAUDE.md", backups / ".claude")
+    link(ROOT / "global" / "AGENTS.md", CODEX / "AGENTS.md", backups / ".codex")
+    link(ROOT / "global" / "pstack-models.md", CLAUDE / "rules" / "pstack-models.md", backups / ".claude/rules")
+    say("linked global instructions, pstack model rule and agents")
+
+    merge_json(ROOT / "config" / "claude" / "settings.json", CLAUDE / "settings.json", backups / ".claude")
+    merge_json(ROOT / "config" / "codex" / "hooks.json", CODEX / "hooks.json", backups / ".codex")
+    merge_codex_config(backups)
+    if backups.exists():
+        say(f"backups in {backups}")
+
+
+def adopt_agents_skills(backups: Path) -> None:
+    """One-time: move a skills.sh-managed ~/.agents/skills aside so dstack owns it."""
+    lockfile = HOME / ".agents" / ".skill-lock.json"
+    if not lockfile.exists():
+        return
+    dest = backups / ".agents"
+    dest.mkdir(parents=True, exist_ok=True)
+    shutil.move(str(lockfile), dest / ".skill-lock.json")
+    if AGENTS_SKILLS.exists():
+        shutil.move(str(AGENTS_SKILLS), dest / "skills")
+    say(f"moved skills.sh-managed ~/.agents/skills to {dest}")
+
+
+def deep_merge(base: dict, over: dict) -> dict:
+    for k, v in over.items():
+        base[k] = deep_merge(base.get(k, {}), v) if isinstance(v, dict) and isinstance(base.get(k), dict) else v
+    return base
+
+
+def expand(obj):
+    if isinstance(obj, str):
+        return obj.replace("$DSTACK", str(ROOT))
+    if isinstance(obj, list):
+        return [expand(x) for x in obj]
+    if isinstance(obj, dict):
+        return {k: expand(v) for k, v in obj.items()}
+    return obj
+
+
+def merge_json(src: Path, path: Path, backups: Path) -> None:
+    """Deep-merge dstack's keys over a JSON file. Lists (e.g. hook arrays) are replaced, not appended."""
+    current = load_json(path, {})
+    managed = expand(load_json(src))
+    managed.pop("$comment", None)
+    merged = deep_merge(json.loads(json.dumps(current)), managed)
+    if merged != current:
+        backup(path, backups)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        write_json(path, merged)
+        say(f"updated {path}")
+
+
+TOML_KEY = re.compile(r"^\s*([A-Za-z0-9_\-\"\.]+)\s*=")
+
+
+def merge_codex_config(backups: Path) -> None:
+    """Set dstack's keys in ~/.codex/config.toml without touching anything else.
+
+    config/codex/config.toml holds `[table]` sections with flat `key = value` lines.
+    Each key replaces the same key in the same table, or is appended to that table.
+    """
+    path = CODEX / "config.toml"
+    lines = path.read_text().splitlines() if path.exists() else []
+    original = list(lines)
+    for table, key, raw in parse_flat_toml(ROOT / "config" / "codex" / "config.toml"):
+        start, end = table_span(lines, table)
+        if start is None:
+            lines += ["", f"[{table}]", raw]
+            continue
+        for i in range(start, end):
+            m = TOML_KEY.match(lines[i])
+            if m and m.group(1) == key:
+                lines[i] = raw
+                break
+        else:
+            insert = end
+            while insert > start and not lines[insert - 1].strip():
+                insert -= 1
+            lines.insert(insert, raw)
+    if lines != original:
+        backup(path, backups / ".codex")
+        path.write_text("\n".join(lines) + "\n")
+        say(f"updated {path}")
+
+
+def parse_flat_toml(path: Path):
+    table = ""
+    for line in path.read_text().splitlines():
+        s = line.strip()
+        if not s or s.startswith("#"):
+            continue
+        if s.startswith("["):
+            table = s.strip("[]")
+            continue
+        m = TOML_KEY.match(s)
+        if m:
+            yield table, m.group(1), s
+
+
+def table_span(lines: list[str], table: str):
+    """Line range [start, end) of a table's body; the root table is everything before the first header."""
+    header = re.compile(r"^\s*\[")
+    if table == "":
+        end = next((i for i, l in enumerate(lines) if header.match(l)), len(lines))
+        return 0, end
+    for i, l in enumerate(lines):
+        if l.strip() == f"[{table}]":
+            end = next((j for j in range(i + 1, len(lines)) if header.match(lines[j])), len(lines))
+            return i + 1, end
+    return None, None
+
+
+def backup(path: Path, dest: Path) -> None:
+    if path.exists():
+        dest.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(path, dest / path.name)
+
+
+# ---------------------------------------------------------------- status
+
+def status() -> None:
+    lock = load_json(LOCK)
+    if not lock:
+        sys.exit("no dstack.lock.json; run `bin/dstack sync` first")
+    skills = all_skills(lock)
+    for d in SKILL_DIRS:
+        missing = [s for s in skills if not (d / s).is_symlink()]
+        foreign = sorted(e.name for e in d.iterdir() if not owned(e) and not e.name.startswith(".")) if d.exists() else []
+        say(f"{d}: {len(skills) - len(missing)}/{len(skills)} linked"
+            + (f", missing {', '.join(missing)}" if missing else "")
+            + (f", unmanaged: {', '.join(foreign)}" if foreign else ""))
+    for name, entry in lock["sources"].items():
+        try:
+            head = git("ls-remote", entry["repo"], f"refs/heads/{entry['ref']}").split()[0]
+        except Exception:
+            head = "?"
+        state = "up to date" if head == entry["commit"] else f"upstream moved to {head[:7]}"
+        say(f"{name}: {len(entry['skills'])} skills @ {entry['commit'][:7]} ({state})")
+    bad = [s for s, p in skills.items() if not frontmatter_ok(p / "SKILL.md")]
+    if bad:
+        say(f"skills with broken frontmatter: {', '.join(bad)}")
+
+
+def frontmatter_ok(path: Path) -> bool:
+    text = path.read_text()
+    return text.startswith("---") and re.search(r"^name:", text, re.M) and re.search(r"^description:", text, re.M)
+
+
+def main() -> None:
+    cmd, *args = sys.argv[1:] or ["help"]
+    if cmd == "sync":
+        sync(args)
+    elif cmd == "install":
+        install()
+    elif cmd == "status":
+        status()
+    else:
+        print(__doc__)
+
+
+if __name__ == "__main__":
+    main()
