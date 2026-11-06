@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: ${{ matrix.os }} / python ${{ matrix.python }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        python: ["3.9", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Install shellcheck and jq
+        run: |
+          if [ "$RUNNER_OS" = "macOS" ]; then
+            command -v shellcheck >/dev/null || brew install shellcheck
+            command -v jq >/dev/null || brew install jq
+          else
+            command -v shellcheck >/dev/null || sudo apt-get install -y shellcheck
+            command -v jq >/dev/null || sudo apt-get install -y jq
+          fi
+          shellcheck --version | head -2
+
+      - name: Tests, bash -n and shellcheck
+        run: python bin/dstack test -v
+
+      - name: Repo consistency (lock, vendor/, skills, config)
+        run: python bin/dstack doctor --repo-only
