@@ -33,6 +33,14 @@ jq -s '.[0] * .[1]' ~/.claude/settings.json config/claude-settings.json > /tmp/s
 
 For Codex, paste `config/codex-config.toml` into `~/.codex/config.toml`.
 
+If you installed with the old `bin/dstack`, also remove its guard hook, whose script no longer exists:
+
+```bash
+jq 'if .hooks.PreToolUse then .hooks.PreToolUse |= map(select(all(.hooks[]?; .command | test("dstack/config/hooks/") | not))) else . end' \
+  ~/.claude/settings.json > /tmp/s.json && mv /tmp/s.json ~/.claude/settings.json
+rm ~/.codex/hooks.json   # it held only the dstack hook; check first if you added your own
+```
+
 | | Claude Code | Codex |
 | --- | --- | --- |
 | Model | `opus[1m]` (Opus 5.5, 1M context) | `gpt-6.1-sol` (500K context) |
