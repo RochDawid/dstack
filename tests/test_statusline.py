@@ -383,10 +383,18 @@ class GitTests(StatuslineCase):
 
     def test_without_gh(self):
         repo = self.make_repo()
-        path = os.pathsep.join(
-            d for d in os.environ.get("PATH", "").split(os.pathsep) if not os.path.exists(os.path.join(d, "gh"))
-        )
-        out = self.run_sl(self.payload(cwd=repo), PATH=path)
+        # gh often shares a directory with git and jq (/usr/bin on Ubuntu), so dropping whole
+        # PATH entries would hide those too. Link every other tool into one directory instead.
+        nogh = os.path.join(self.tmp, "nogh")
+        os.mkdir(nogh)
+        for d in os.environ.get("PATH", "").split(os.pathsep):
+            if not os.path.isdir(d):
+                continue
+            for name in os.listdir(d):
+                src, dst = os.path.join(d, name), os.path.join(nogh, name)
+                if name != "gh" and not os.path.lexists(dst) and os.access(src, os.X_OK):
+                    os.symlink(src, dst)
+        out = self.run_sl(self.payload(cwd=repo), PATH=nogh)
         self.assertEqual(out.split(SEP)[2], "main")
         self.assertFalse(os.path.exists(os.path.join(self.cache, "dstack")))
 
