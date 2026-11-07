@@ -2,23 +2,23 @@
 
 Instructions for agents changing this repo. For what dstack is, read `README.md`.
 
-This checkout is live: `~/.claude` and `~/.codex` link into it, and its guard and statusline run in every session. A broken commit on `main` breaks the agent you're running in.
+This checkout is live: `~/.claude` and `~/.agents` link into it, and its statusline runs in every Claude Code session. A broken commit on `main` breaks the agent you're running in.
 
 ## Rules
 
-- **Python 3.9, stdlib only.** macOS ships 3.9.6. Use `from __future__ import annotations`; no `match`, no `X | Y` in runtime expressions, no third-party packages.
-- **Never run `install` or `uninstall` against the real home in tests or experiments.** Set `DSTACK_HOME` (or `HOME`) to a temp dir. Read-only commands (`status`, `doctor`, `install --dry-run`) are fine.
-- **Don't edit `vendor/`.** `sync` overwrites it. To change a vendored skill, copy it into `skills/<name>/`, which overrides it.
+- **Keep it small.** dstack is a folder of skills, an install script and a few config files. Don't add tooling, such as sync scripts, lock files or config merging, unless asked. A README step is fine for something done once.
+- **Skills live flat in `skills/<name>/`.** Vendored skills are plain copies. Edit them freely, and update the "Vendored at" table in `README.md` when you refresh one from upstream.
+- **Keep pstack's layout** (`skills/`, `agents/`, `docs/`) at the repo root. pstack skills link to `../../docs/...`, so moving those folders breaks the links.
 - **Keep `global/AGENTS.md` minimal.** It's loaded into every session in both harnesses.
-- **Every behavior change gets a test** in `tests/`. Tests run the real scripts in subprocesses.
-- **Guard changes need table cases** in `tests/test_guard.py` for both directions: what now blocks, and what must still pass. Write dangerous commands only inside test files; the live guard blocks them in your shell.
+- **Shell only, macOS bash 3.2 compatible.** `install.sh` and `config/statusline.sh` must pass `shellcheck`.
+- **Deny rules change in two places:** `permissions.deny` in `config/claude-settings.json` and `config/codex.rules`. Check Codex rules with `codex execpolicy check -r config/codex.rules <command...>`. Codex ignores symlinked rules files, which is why `install.sh` copies that one.
 - **Commits** have no attribution trailers.
 
 ## Check before you push
 
 ```bash
-bin/dstack test -v              # all suites, bash -n, shellcheck if installed
-bin/dstack doctor --repo-only   # lock, vendor/, skill frontmatter, config parse
+shellcheck install.sh config/statusline.sh
+./install.sh   # idempotent; re-run after adding or removing a skill
 ```
 
-CI runs both on Ubuntu and macOS with Python 3.9 and 3.12.
+CI runs shellcheck, checks every `SKILL.md` for `name` and `description`, and renders a sample statusline.

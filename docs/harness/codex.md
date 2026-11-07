@@ -1,8 +1,8 @@
 # pstack in Codex
 
-pstack skills use Cursor names. In Codex, read this file once per session, then map each Cursor name in a skill with the tables below. `<pstack>` is `/Users/dawidroch/.t3/projects/dstack/vendor/pstack`. If a Cursor field has no row, drop it and say so. Never pass a field or value the tool schema rejects. Check the schema of a tool before you use a field this file names, because Codex tool names and fields change between versions.
+pstack skills use Cursor names. In Codex, read this file once per session, then map each Cursor name in a skill with the tables below. `<pstack>` is the dstack repo, `/Users/dawidroch/.t3/projects/dstack`. If a Cursor field has no row, drop it and say so. Never pass a field or value the tool schema rejects. Check the schema of a tool before you use a field this file names, because Codex tool names and fields change between versions.
 
-This file mirrors `<pstack>/docs/harness/claude-code.md`. When the two disagree on something harness-neutral, the Claude Code adapter is the upstream source.
+This file mirrors `<pstack>/docs/harness/claude-code.md`, which comes from upstream pstack. When the two disagree on something harness-neutral, the Claude Code adapter is the upstream source.
 
 ## Tools
 
