@@ -445,6 +445,8 @@ def lex(s):
         elif s.startswith("$((", i):
             j = _scan_paren(s, i + 2)
             add("bare", s[i:j], i)
+            for sub in _nested_subs(s[i + 3:j - 2]):
+                add("sub", sub, i)
             i = j
         elif s.startswith("$(", i) or s.startswith("<(", i) or s.startswith(">(", i):
             j = _scan_paren(s, i + 2)
@@ -457,6 +459,8 @@ def lex(s):
         elif s.startswith("${", i):
             j = _scan_brace(s, i)
             add("bare", s[i:j], i)
+            for sub in _nested_subs(s[i + 2:j - 1]):
+                add("sub", sub, i)
             i = j
         elif c == "#" and start[0] is None:
             eol = s.find("\n", i)
@@ -480,6 +484,29 @@ def lex(s):
             i += 1
     flush(n)
     return tokens
+
+
+def _nested_subs(text):
+    """Command substitutions inside an expansion the lexer keeps as text, such as
+    ``$(( $(cmd) + 1 ))`` or ``${VAR:-$(cmd)}``. Bash runs them, so they are checked."""
+    subs = []
+    i, n = 0, len(text)
+    while i < n:
+        if text.startswith("$((", i):
+            i += 3
+        elif text.startswith("$(", i):
+            j = _scan_paren(text, i + 2)
+            subs.append(text[i + 2:j - 1])
+            i = j
+        elif text[i] == "`":
+            j = _scan_backtick(text, i)
+            subs.append(text[i + 1:j - 1].replace("\\`", "`"))
+            i = j
+        elif text[i] == "\\":
+            i += 2
+        else:
+            i += 1
+    return subs
 
 
 def _add_dq(inner, offset, add):
@@ -506,6 +533,11 @@ def _add_dq(inner, offset, add):
         elif inner.startswith("$((", i):
             j = _scan_paren(inner, i + 2)
             buf.append(inner[i:j])
+            subs = _nested_subs(inner[i + 3:j - 2])
+            if subs:
+                flush()
+                for sub in subs:
+                    add("sub", sub, offset)
             i = j
         elif inner.startswith("$(", i) or c == "`":
             flush()
@@ -1283,6 +1315,13 @@ def check_find(name, args, cmd, ctx, xargs):
             argv = args[i + 1:j]
             if argv and _base(argv[0]) in RM_LIKE:
                 deleting = True
+                # Operands built from {} are the search results, judged through the find paths
+                # below. Any other operand is a fixed path rm deletes on every match.
+                fixed = [w for w in argv[1:] if "{}" not in w.value]
+                if any(not w.value.startswith("-") for w in fixed):
+                    sub = Simple(cmd.source)
+                    sub.words = [argv[0]] + fixed
+                    check_argv(list(sub.words), sub, ctx.child())
             elif argv:
                 sub = Simple(cmd.source)
                 sub.words = list(argv)
