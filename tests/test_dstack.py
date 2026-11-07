@@ -408,6 +408,16 @@ class DoctorStatusTest(DstackTestCase):
         self.assertIn("vendor/alpha: skills not in the lock: extra", out)
         self.assertIn("vendor/ has directories no source owns: orphan", out)
 
+    def test_doctor_repo_only_rejects_invalid_toml_value(self):
+        path = self.repo / "config/codex/config.toml"
+        path.write_text(path.read_text() + "\nmodel_verbosity = not-a-valid-value\n")
+        out = self.run_dstack(self.repo, "doctor", "--repo-only", expect=1).stdout
+        self.assertIn("repo config:", out)
+        self.assertIn("not-a-valid-value", out)
+        self.assertNotIn("all good", out)
+        self.run_dstack(self.repo, "install", expect=1)
+        self.assertFalse((self.home / ".codex/config.toml").exists(), "install wrote invalid TOML")
+
     def test_status_exit_codes(self):
         out = self.run_dstack(self.repo, "status", "--offline", expect=1).stdout
         self.assertIn(f"{self.home}/.claude/skills: 0/3 linked, missing one, two, three", out)
@@ -525,6 +535,28 @@ class SyncTest(DstackTestCase):
         lock = json.loads((repo / "dstack.lock.json").read_text())
         self.assertEqual(lock["sources"]["alpha"]["commit"], "a" * 40, "sync beta touched alpha")
         self.assertNotEqual(lock["sources"]["beta"]["commit"], "b" * 40)
+
+
+    def test_partial_sync_keeps_sources_removed_from_manifest(self):
+        repo = self.make_repo()
+        url, _ = self.make_upstream()
+        self.configure(repo, url, {"three": "skills/three"})
+        manifest = json.loads((repo / "dstack.json").read_text())
+        del manifest["sources"]["alpha"]
+        manifest["agents"] = []
+        (repo / "dstack.json").write_text(json.dumps(manifest, indent=2))
+
+        self.run_dstack(repo, "sync", "beta")
+        lock = json.loads((repo / "dstack.lock.json").read_text())
+        self.assertIn("alpha", lock["sources"], "a partial sync dropped an unselected source from the lock")
+        self.assertTrue((repo / "vendor/alpha").is_dir())
+        self.assertNotIn("no source owns", self.run_dstack(repo, "doctor", "--repo-only", expect=None).stdout)
+
+        out = self.run_dstack(repo, "sync").stdout
+        self.assertIn("alpha: removed (no longer in dstack.json)", out)
+        lock = json.loads((repo / "dstack.lock.json").read_text())
+        self.assertNotIn("alpha", lock["sources"])
+        self.assertFalse((repo / "vendor/alpha").exists())
 
 
 class TestCommandTest(DstackTestCase):

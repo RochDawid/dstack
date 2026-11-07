@@ -500,7 +500,12 @@ def sync(only: list[str]) -> None:
             if (VENDOR / name).exists():
                 shutil.rmtree(VENDOR / name)
             say(f"  {name}: removed (no longer in dstack.json)")
-    lock["sources"] = {n: lock["sources"][n] for n in manifest["sources"] if n in lock["sources"]}
+    # Manifest order first. A partial sync keeps entries it was not asked about, even ones gone
+    # from dstack.json, so the lock keeps describing what is in vendor/ until a full sync.
+    ordered = {n: lock["sources"][n] for n in manifest["sources"] if n in lock["sources"]}
+    if only:
+        ordered.update((n, e) for n, e in lock["sources"].items() if n not in ordered)
+    lock["sources"] = ordered
     write_atomic(LOCK, dump_json(lock))
     for skill, winner, loser in collisions(lock):
         say(f"  warning: `{skill}` comes from both {winner} and {loser}; {winner} wins")
@@ -719,8 +724,14 @@ def toml_statements(lines: list[str]) -> Iterator[tuple[int, int, str, Optional[
 
 
 def parse_flat_toml(path: Path) -> list[TomlKey]:
-    """The `key = value` entries of dstack's config.toml, each with its table."""
-    lines = path.read_text(encoding="utf-8").splitlines()
+    """The `key = value` entries of dstack's config.toml, each with its table. Raises on invalid TOML."""
+    text = path.read_text(encoding="utf-8")
+    lines = text.splitlines()
+    err = toml_error(text)
+    if err:
+        m = re.search(r"line (\d+)", err)
+        bad = f": `{lines[int(m.group(1)) - 1].strip()}`" if m and 0 < int(m.group(1)) <= len(lines) else ""
+        raise DstackError(f"{path}: invalid TOML: {err}{bad}")
     out, table = [], ()
     for start, end, kind, name in toml_statements(lines):
         if kind == "table":
@@ -728,7 +739,12 @@ def parse_flat_toml(path: Path) -> list[TomlKey]:
         elif kind == "array-table":
             raise DstackError(f"{path}: array tables ([[...]]) are not supported")
         elif kind == "key":
-            out.append(TomlKey(table, name, [lines[start].strip(), *lines[start + 1:end]]))
+            raw = [lines[start].strip(), *lines[start + 1:end]]
+            if not HAVE_TOMLLIB:
+                err = toml_value_error("\n".join(raw).split("=", 1)[1])
+                if err:
+                    raise DstackError(f"{path}:{start + 1}: {err}")
+            out.append(TomlKey(table, name, raw))
         elif lines[start].strip() and not lines[start].strip().startswith("#"):
             raise DstackError(f"{path}:{start + 1}: cannot parse `{lines[start].strip()}`")
     return out
@@ -769,11 +785,32 @@ def merge_toml_lines(lines: list[str], managed: list[TomlKey]) -> list[str]:
     return lines
 
 
+try:
+    import tomllib  # type: ignore[import-not-found]  # Python 3.11+
+    HAVE_TOMLLIB = True
+except ImportError:
+    HAVE_TOMLLIB = False
+
+_TOML_SCALAR = re.compile(r"""'[^'\n]*'|[+-]?(?:\d[\d_]*)(?:\.\d[\d_]*)?(?:[eE][+-]?\d+)?""")
+
+
+def toml_value_error(value: str) -> Optional[str]:
+    """Without tomllib, accept only values whose shape is checkable: JSON-compatible values
+    (basic strings, numbers, booleans, arrays of them), literal strings and plain numbers."""
+    v = re.sub(r"\s+#[^\"']*$", "", value.strip())  # trailing comment
+    if _TOML_SCALAR.fullmatch(v):
+        return None
+    try:
+        json.loads(re.sub(r",(\s*)\]", r"\1]", v))  # TOML arrays may end with a comma
+        return None
+    except ValueError:
+        return (f"`{v}` is not a valid TOML value, or not one dstack can check without tomllib "
+                "(Python 3.11+); use a quoted string, number, boolean or array of those")
+
+
 def toml_error(text: str) -> Optional[str]:
     """Why `text` is invalid TOML, when Python can tell (3.11+ ships tomllib)."""
-    try:
-        import tomllib  # type: ignore[import-not-found]
-    except ImportError:
+    if not HAVE_TOMLLIB:
         return None
     try:
         tomllib.loads(text)
