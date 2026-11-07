@@ -20,8 +20,16 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # 3.9 is the oldest Python we support (macOS ships 3.9.6). setup-python has no 3.9
+        # build for ubuntu-latest (26.04), so the 3.9 Linux job pins ubuntu-24.04.
         os: [ubuntu-latest, macos-latest]
         python: ["3.9", "3.12"]
+        exclude:
+          - os: ubuntu-latest
+            python: "3.9"
+        include:
+          - os: ubuntu-24.04
+            python: "3.9"
     steps:
       - uses: actions/checkout@v4
 
