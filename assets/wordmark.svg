@@ -1,7 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 64" role="img" aria-label="dstack">
   <style>
-    .t { fill: #0B0F17; font: 600 36px ui-sans-serif, "SF Pro Display", Inter, system-ui, -apple-system, "Segoe UI", sans-serif; letter-spacing: -0.6px; }
-    @media (prefers-color-scheme: dark) { .t { fill: #E6EDF3; } }
+    .t { fill: #E6EDF3; font: 600 36px ui-sans-serif, "SF Pro Display", Inter, system-ui, -apple-system, "Segoe UI", sans-serif; letter-spacing: -0.6px; }
   </style>
   <g transform="translate(-14 0)"><defs>
     <linearGradient id="dstack-g" x1="19" y1="51" x2="45" y2="13" gradientUnits="userSpaceOnUse">
