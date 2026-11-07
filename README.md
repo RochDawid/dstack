@@ -2,7 +2,7 @@
 
 # dstack
 
-My skills and agent-harness config, shared by Claude Code and Codex (both run inside T3 Code).
+My skills and agent-harness config, shared by Claude Code and Codex.
 
 ## Layout
 
