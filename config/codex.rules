@@ -1,0 +1,14 @@
+# Commands Codex must never run on its own. Linked into ~/.codex/rules/ by install.sh.
+# Rules match a command's leading tokens; a list in a position matches any of its items.
+# Mirrors the `permissions.deny` list for Claude Code in README.md.
+
+prefix_rule(pattern=["git", "push", ["--force", "-f", "--delete"]], decision="forbidden", justification="Force pushes and remote deletes rewrite shared history. Use --force-with-lease, or ask the user.")
+prefix_rule(pattern=["git", "reset", "--hard"], decision="forbidden", justification="Discards uncommitted work.")
+prefix_rule(pattern=["git", "clean", ["-f", "-fd", "-fdx", "-df", "-dfx", "-xfd"]], decision="forbidden", justification="Deletes untracked files.")
+prefix_rule(pattern=["git", "branch", "-D"], decision="forbidden", justification="Deletes unmerged branches. Use -d.")
+prefix_rule(pattern=["git", "checkout", ["."]], decision="forbidden", justification="Discards all working-tree changes.")
+prefix_rule(pattern=["git", "checkout", "--", "."], decision="forbidden", justification="Discards all working-tree changes.")
+prefix_rule(pattern=["git", "restore", "."], decision="forbidden", justification="Discards all working-tree changes.")
+prefix_rule(pattern=["git", "stash", ["drop", "clear"]], decision="forbidden", justification="Drops stashed work.")
+prefix_rule(pattern=["git", ["filter-branch", "filter-repo"]], decision="forbidden", justification="Rewrites history.")
+prefix_rule(pattern=["rm", ["-rf", "-fr"], ["/", "~", "~/", ".."]], decision="forbidden", justification="Deletes far outside the project.")

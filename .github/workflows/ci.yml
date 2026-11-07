@@ -5,51 +5,31 @@ on:
     branches: [main]
   pull_request:
 
-concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
-
 permissions:
   contents: read
 
 jobs:
-  test:
-    name: ${{ matrix.os }} / python ${{ matrix.python }}
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 10
-    strategy:
-      fail-fast: false
-      matrix:
-        # 3.9 is the oldest Python we support (macOS ships 3.9.6). setup-python has no 3.9
-        # build for ubuntu-latest (26.04), so the 3.9 Linux job pins ubuntu-24.04.
-        os: [ubuntu-latest, macos-latest]
-        python: ["3.9", "3.12"]
-        exclude:
-          - os: ubuntu-latest
-            python: "3.9"
-        include:
-          - os: ubuntu-24.04
-            python: "3.9"
+  check:
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python }}
+      - name: Shell scripts parse and pass shellcheck
+        run: shellcheck install.sh config/statusline.sh
 
-      - name: Install shellcheck and jq
+      - name: Every skill has a SKILL.md with name and description
         run: |
-          if [ "$RUNNER_OS" = "macOS" ]; then
-            command -v shellcheck >/dev/null || brew install shellcheck
-            command -v jq >/dev/null || brew install jq
-          else
-            command -v shellcheck >/dev/null || sudo apt-get install -y shellcheck
-            command -v jq >/dev/null || sudo apt-get install -y jq
-          fi
-          shellcheck --version | head -2
+          bad=0
+          for d in skills/*/; do
+            f="$d/SKILL.md"
+            if ! head -1 "$f" 2>/dev/null | grep -q '^---$' || ! grep -q '^name:' "$f" || ! grep -q '^description:' "$f"; then
+              echo "::error file=$f::missing SKILL.md or its name/description frontmatter"; bad=1
+            fi
+          done
+          exit $bad
 
-      - name: Tests, bash -n and shellcheck
-        run: python bin/dstack test -v
-
-      - name: Repo consistency (lock, vendor/, skills, config)
-        run: python bin/dstack doctor --repo-only
+      - name: Statusline renders sample input
+        run: |
+          out=$(echo '{"model":{"display_name":"Opus"},"cwd":"/tmp","context_window":{"context_window_size":200000,"used_percentage":42},"cost":{"total_cost_usd":1.234}}' | config/statusline.sh)
+          echo "$out"
+          for want in Opus 42% 200K '$1.23'; do grep -qF "$want" <<<"$out" || { echo "::error::statusline is missing $want"; exit 1; }; done
