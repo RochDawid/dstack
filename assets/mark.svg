@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="dstack">
+  <defs>
+    <linearGradient id="dstack-g" x1="19" y1="51" x2="45" y2="13" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#22D3EE"/>
+      <stop offset="1" stop-color="#A78BFA"/>
+    </linearGradient>
+    <mask id="dstack-m" maskUnits="userSpaceOnUse" x="0" y="0" width="64" height="64">
+      <rect width="64" height="64" fill="#fff"/>
+      <rect y="32.6" width="64" height="2" fill="#000"/>
+      <rect y="41.4" width="64" height="2" fill="#000"/>
+    </mask>
+  </defs>
+  <g fill="url(#dstack-g)" mask="url(#dstack-m)">
+    <path fill-rule="evenodd" d="M32 25a13 13 0 1 0 0 26a13 13 0 1 0 0-26zm0 6a7 7 0 1 1 0 14a7 7 0 1 1 0-14z"/>
+    <path d="M39 16a3 3 0 0 1 6 0v35h-6z"/>
+  </g>
+</svg>
