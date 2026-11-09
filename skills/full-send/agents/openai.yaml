@@ -1,0 +1,5 @@
+interface:
+  display_name: "Full Send"
+  short_description: "Ship a task as a reviewed, merged PR"
+policy:
+  allow_implicit_invocation: false
