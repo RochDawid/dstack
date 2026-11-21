@@ -75,7 +75,7 @@ The repo root keeps pstack's layout (`skills/`, `agents/`, `docs/`), so pstack's
 | [Cursor team kit](https://github.com/cursor/plugins/tree/main/cursor-team-kit) | All 18: `fix-ci`, `loop-on-ci`, `review-and-ship`, `new-branch-and-pr`, `get-pr-comments`, `deslop`, `what-did-i-get-done`, … | `2776ddd` |
 | [Matt Pocock](https://github.com/mattpocock/skills) | The spec → ship flow: `grill-me`, `grilling`, `grill-with-docs`, `to-spec`, `to-tickets`, `implement`, `implement-spec`, `wayfinder`, `to-questionnaire`, `setup-matt-pocock-skills`, plus `research` and `prototype`, which `wayfinder` calls. `tdd` and `teach` come from pstack. | `4ae2317` |
 | [find-skills](https://github.com/vercel-labs/skills) | `find-skills` | `d3701c1` |
-| Mine | `chief-of-staff`: the agent behind ATC (`~/dev/atc`)'s Chief panel. Briefs you, triages GitHub issues, starts and steers T3 agents. | |
+| Mine | `chief-of-staff`: the agent behind [ATC](https://github.com/RochDawid/atc)'s Chief panel. Briefs you, triages GitHub issues, starts and steers T3 agents. | |
 
 ### Adding or updating a skill
 
