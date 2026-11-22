@@ -10,7 +10,7 @@ This file mirrors `<pstack>/docs/harness/claude-code.md`, which comes from upstr
 | --- | --- |
 | `Task` | `spawn_agent` with the brief as the message, then `wait_agent` (or `wait`) for the result. Run independent agents together and wait on all of them. Close each one with `close_agent` when it is done. When the session has no multi-agent tools, do the subagent's work yourself, in order, and say so once. |
 | `AskQuestion` | `request_user_input` if the session offers it. Otherwise ask in plain text and stop until the user answers. |
-| Open a todolist | `update_plan`. |
+| Open a todolist, or copy steps into the todolist tool | `update_plan`. |
 | Run another pstack skill (`/name` or "the **name** skill") | Read `<pstack>/skills/<name>/SKILL.md` and follow it. When you tell the user to type it, write `$<name>` (Codex skill mention) or `/<name>`. |
 | `Grep`, `Glob` | `rg` and `rg --files` in the shell. |
 | `ReadFile`, `Write`, `StrReplace`, `Delete` | Read with the shell, edit with `apply_patch`. |
@@ -22,6 +22,7 @@ This file mirrors `<pstack>/docs/harness/claude-code.md`, which comes from upstr
 | --- | --- |
 | `subagent_type: generalPurpose` | Default `spawn_agent`. |
 | `poteto-agent`, `comment-sicko` | Read `<pstack>/agents/<name>.md` and put its body at the top of the brief. Pass an agent type only if the schema lists one with that name. |
+| The `model:` line in `poteto-agent`'s file | Ignore it. Pick the model from the role's line, mapped with the Models table. |
 | `readonly: true` | Add to the brief: "Read-only: do not edit, create, or delete files." Check `git status` afterward. |
 | `readonly: false` | Default. |
 | `environment: "cloud"` | Give the worker its own checkout: `git worktree add <path> -b <branch> <base>`, and name the path in the brief. With T3 Code, `delegate_task` with `isolation: "worktree"` does this for you. |
@@ -35,8 +36,8 @@ This file mirrors `<pstack>/docs/harness/claude-code.md`, which comes from upstr
 
 | Cursor | Codex |
 | --- | --- |
-| `gpt-<family>-<effort>`, such as `gpt-6.1-sol-high` | `model: "gpt-6.1-sol"` and `reasoning_effort: "high"` on `spawn_agent`, if its schema has those fields. Otherwise omit them, so the agent runs on the session model, and say so. |
-| A `claude-*`, `grok-*`, or other non-OpenAI slug | Through T3 Code's `delegate_task` when available (see `~/.codex/AGENTS.md`). Otherwise omit the model and say so. |
+| `gpt-<family>-<effort>`, such as `gpt-6.2-sol-high` | `model: "gpt-6.2-sol"` and `reasoning_effort: "high"` on `spawn_agent`, if its schema has those fields. Otherwise omit them, so the agent runs on the session model, and say so. |
+| A `claude-*`, `gemini-*`, or other non-OpenAI slug | Through T3 Code's `delegate_task` when available (see `~/.codex/AGENTS.md`). Drop a trailing `-fast`. Otherwise omit the model and say so. |
 | `auto` or `inherit-parent` | Omit the model. |
 | The `pstack-models.mdc` rule | `/Users/dawidroch/.t3/projects/dstack/global/pstack-models.md`. Codex does not load it on its own: read it when a skill needs a role's model. If the file or the role's line is missing, use the skill's default slug. |
 

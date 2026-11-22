@@ -1,5 +1,5 @@
 # Paste at the top of ~/.codex/config.toml (before the first [table]), replacing any existing copies of these keys.
-model = "gpt-6.1-sol"
+model = "gpt-6.2-sol"
 model_reasoning_effort = "medium"
 approval_policy = "never"
 sandbox_mode = "danger-full-access"

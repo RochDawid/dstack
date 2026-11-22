@@ -43,7 +43,7 @@ rm ~/.codex/hooks.json   # it held only the dstack hook; check first if you adde
 
 | | Claude Code | Codex |
 | --- | --- | --- |
-| Model | `opus[1m]` (Opus 5.5, 1M context) | `gpt-6.1-sol` (500K context) |
+| Model | `opus[1m]` (Opus 5.5, 1M context) | `gpt-6.2-sol` (500K context) |
 | Effort | medium | medium |
 | Permissions | `bypassPermissions`, with a `permissions.deny` list | `approval_policy = "never"`, `danger-full-access`, with `config/codex.rules` |
 | Statusline | `config/statusline.sh`: model · effort │ dir │ branch* │ #PR │ context bar │ cost | built-in items, the same set |
@@ -71,22 +71,27 @@ The repo root keeps pstack's layout (`skills/`, `agents/`, `docs/`), so pstack's
 
 | Source | Skills | Vendored at |
 | --- | --- | --- |
-| [pstack](https://github.com/cursor/plugins/tree/main/pstack) | All 58. Start rigorous work with `/poteto-mode`; ask `/poteto-help` when unsure. | `2776ddd` |
-| [Cursor team kit](https://github.com/cursor/plugins/tree/main/cursor-team-kit) | All 18: `fix-ci`, `loop-on-ci`, `review-and-ship`, `new-branch-and-pr`, `get-pr-comments`, `deslop`, `what-did-i-get-done`, … | `2776ddd` |
+| [pstack](https://github.com/cursor/plugins/tree/main/pstack) | All 58. Start rigorous work with `/poteto-mode`; ask `/poteto-help` when unsure. | `ec5dbf8` |
+| [Cursor team kit](https://github.com/cursor/plugins/tree/main/cursor-team-kit) | All 18: `fix-ci`, `loop-on-ci`, `review-and-ship`, `new-branch-and-pr`, `get-pr-comments`, `deslop`, `what-did-i-get-done`, … | `ec5dbf8` |
 | [Matt Pocock](https://github.com/mattpocock/skills) | The spec → ship flow: `grill-me`, `grilling`, `grill-with-docs`, `to-spec`, `to-tickets`, `implement`, `implement-spec`, `wayfinder`, `to-questionnaire`, `setup-matt-pocock-skills`, plus `research` and `prototype`, which `wayfinder` calls. `tdd` and `teach` come from pstack. | `4ae2317` |
 | [find-skills](https://github.com/vercel-labs/skills) | `find-skills` | `d3701c1` |
-| Mine | `chief-of-staff`: the agent behind [ATC](https://github.com/RochDawid/atc)'s Chief panel. Briefs you, triages GitHub issues, starts and steers T3 agents. | |
+| Mine | `chief-of-staff`: the agent behind [ATC](https://github.com/RochDawid/atc)'s Chief panel. Briefs you, triages GitHub issues, starts and steers T3 agents. Also `full-send` and `repro-first`. | |
+
+Local edits to vendored files, to re-apply after a refresh: `agents/poteto-agent.md` says `model: opus`, because upstream's Cursor slug there is not a Claude Code model.
 
 ### Adding or updating a skill
 
 - **Your own:** create `skills/<name>/SKILL.md`, then run `install.sh`.
 - **From upstream:** copy the skill folder into `skills/`, run `install.sh`, and update the table above.
-- **Refreshing upstream:** clone the source and copy its skill folders over the ones in `skills/`. Review the result with `git diff`, keep or revert your local edits, then update the "Vendored at" commit. For example:
+- **Refreshing upstream:** clone the source and copy its skill folders over the ones in `skills/`. Delete a skill folder first so files upstream removed go too. Review the result with `git diff`, keep or revert your local edits, then update the "Vendored at" commit. For example:
 
   ```bash
   git clone --depth 1 https://github.com/cursor/plugins /tmp/cursor-plugins
   cp -R /tmp/cursor-plugins/pstack/skills/* skills/
   cp -R /tmp/cursor-plugins/pstack/docs/guide docs/
   cp /tmp/cursor-plugins/pstack/docs/harness/claude-code.md docs/harness/
+  cp /tmp/cursor-plugins/pstack/README.md docs/pstack-README.md
+  cp /tmp/cursor-plugins/pstack/agents/*.md agents/
+  cp -R /tmp/cursor-plugins/cursor-team-kit/skills/* skills/
   git diff --stat
   ```
