@@ -43,7 +43,7 @@ rm ~/.codex/hooks.json   # it held only the dstack hook; check first if you adde
 
 | | Claude Code | Codex |
 | --- | --- | --- |
-| Model | `opus[1m]` (Opus 5.5, 1M context) | `gpt-6.1-sol` (500K context) |
+| Model | `opus[1m]` (Opus 5.5, 1M context) | `gpt-6.2-sol` (500K context) |
 | Effort | medium | medium |
 | Permissions | `bypassPermissions`, with a `permissions.deny` list | `approval_policy = "never"`, `danger-full-access`, with `config/codex.rules` |
 | Statusline | `config/statusline.sh`: model · effort │ dir │ branch* │ #PR │ context bar │ cost | built-in items, the same set |
