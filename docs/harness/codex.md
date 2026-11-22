@@ -37,7 +37,8 @@ This file mirrors `<pstack>/docs/harness/claude-code.md`, which comes from upstr
 | Cursor | Codex |
 | --- | --- |
 | `gpt-<family>-<effort>`, such as `gpt-6.2-sol-high` | `model: "gpt-6.2-sol"` and `reasoning_effort: "high"` on `spawn_agent`, if its schema has those fields. Otherwise omit them, so the agent runs on the session model, and say so. |
-| A `claude-*`, `gemini-*`, or other non-OpenAI slug | Through T3 Code's `delegate_task` when available (see `~/.codex/AGENTS.md`). Drop a trailing `-fast`. Otherwise omit the model and say so. |
+| A `claude-*` slug | Through T3 Code's `delegate_task` when available (see `~/.codex/AGENTS.md`). Drop a trailing `-fast`. Otherwise omit the model and say so. |
+| A `gemini-*`, `grok-*`, or other slug that is neither OpenAI nor Claude | Omit the model so the agent runs on the session model, and say so. Never pass it to `delegate_task`: only Codex and Claude are installed. |
 | `auto` or `inherit-parent` | Omit the model. |
 | The `pstack-models.mdc` rule | `/Users/dawidroch/.t3/projects/dstack/global/pstack-models.md`. Codex does not load it on its own: read it when a skill needs a role's model. If the file or the role's line is missing, use the skill's default slug. |
 
