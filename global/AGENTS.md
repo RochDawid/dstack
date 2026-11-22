@@ -15,7 +15,8 @@ dstack installs pstack as plain user skills, not as a plugin. That changes three
 - Skills and agents have no `pstack:` prefix. The user types `/architect`, not `/pstack:architect`. The subagent types are `poteto-agent` and `comment-sicko`.
 - Per-role models live in `/Users/dawidroch/.t3/projects/dstack/global/pstack-models.md`. Claude Code loads it from `~/.claude/rules/`. In Codex, read it when a skill asks for a role's model. `/setup-pstack` writes to that file, so the change reaches both harnesses.
 
-Two overrides apply to both adapters:
+Three overrides apply to both adapters:
 
+- Only Codex and Claude models are installed. When a skill default or panel seat names another vendor's model (`gemini-*`, `grok-*`), use the role's line in `pstack-models.md`; if there is none, run that seat on the parent model and say so. Never pass such a slug to `Agent`, `spawn_agent` or `delegate_task`.
 - Cross-provider roles. When a role's slug belongs to the other provider (a `gpt-*` slug in Claude Code, a `claude-*` slug in Codex) and T3 Code's `delegate_task` tool is available, run that role through `delegate_task` with that provider and model, and keep the brief self-contained. Without `delegate_task`, follow the adapter: omit the model, so the role runs on the parent model, and say so.
 - `/setup-pstack`. Write Cursor-style slugs (`claude-opus-5-5-high`, `gpt-6.2-sol-high`), not `opus high`, so one file serves both harnesses, and no `-fast` on Claude slugs. Count the models of both providers as detected: Claude Code's `Agent` models, and the Codex models in `~/.codex/models_cache.json`. Keep the owner's comment lines, trailing `# ...` comments, and the `code review` line, which is dstack's own role.
